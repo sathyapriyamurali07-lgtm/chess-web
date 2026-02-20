@@ -3,17 +3,42 @@
 <head>
     <title>Online Chess</title>
 
+    <!-- Libraries -->
     <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <link rel="stylesheet"
-    href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css"/>
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
 
     <style>
-        body { display: flex; gap: 40px; font-family: Arial; }
-        #board { width: 400px; }
-        #moves { height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; }
-        button { margin-top: 10px; }
+        body {
+            display: flex;
+            gap: 40px;
+            font-family: Arial;
+        }
+
+        #board {
+            width: 400px;
+        }
+
+        #moves {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+
+        .highlight {
+            background: radial-gradient(circle, rgba(0,255,0,0.6) 40%, transparent 40%);
+        }
+
+        .in-check {
+            background: red !important;
+        }
+
+        button {
+            margin-top: 10px;
+        }
     </style>
 </head>
 
@@ -22,89 +47,208 @@
 <div>
     <h2>Room: {{ room }}</h2>
     <h3 id="turn">Turn: White</h3>
-    <h3>White: <span id="whiteTimer">5:00</span></h3>
-    <h3>Black: <span id="blackTimer">5:00</span></h3>
+
     <div id="board"></div>
-    <button id="rematchBtn" onclick="rematch()" style="display:none;">🔁 Rematch</button>
+
+    <button id="rematchBtn" onclick="rematch()" style="display:none;">
+        🔁 Rematch
+    </button>
 </div>
 
 <div>
     <h3>Move History</h3>
     <div id="moves"></div>
-    <button onclick="prevMove()">⬅</button>
-    <button onclick="nextMove()">➡</button>
 </div>
 
-<audio id="moveSound" src="https://www.soundjay.com/chess/move.wav"></audio>
-<audio id="checkSound" src="https://www.soundjay.com/chess/check.wav"></audio>
-<audio id="gameOverSound" src="https://www.soundjay.com/chess/game-over.wav"></audio>
+<!-- 🎵 SOUND EFFECTS -->
+<audio id="moveSound"
+src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_8b7b3f5a91.mp3"></audio>
+
+<audio id="captureSound"
+src="https://cdn.pixabay.com/download/audio/2022/03/10/audio_7c0e2b7f0b.mp3"></audio>
+
+<audio id="checkSound"
+src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_8c1d8f9f2e.mp3"></audio>
+
+<audio id="gameOverSound"
+src="https://cdn.pixabay.com/download/audio/2022/03/10/audio_5f1f6f9e10.mp3"></audio>
 
 <script>
 const socket = io();
 const room = "{{ room }}";
 
-let moveList = [];
-let reviewIndex = -1;
+let game = new Chess();
+let playerColor = null;
+let selectedSquare = null;
 let currentTurn = "white";
-let whiteTime = 300;
-let blackTime = 300;
-let timerInterval;
+let moveList = [];
+
+/* 🔊 Safe Sound Player */
+function playSound(id){
+    let sound = document.getElementById(id);
+    if(!sound) return;
+    sound.currentTime = 0;
+    sound.play().catch(()=>{});
+}
 
 const board = Chessboard('board', {
     draggable: true,
     position: 'start',
-    pieceTheme: 'https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/img/chesspieces/wikipedia/{piece}.png',
-    onDrop: function(source, target) {
-        socket.emit("move", { room: room, move: source + target });
-    }
+    pieceTheme:
+    'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png',
+    onDrop: onDrop,
+    onSquareClick: onSquareClick
 });
 
 socket.emit("join", {room: room});
 
+socket.on("color", function(color){
+    playerColor = color;
+});
+
 socket.on("state", function(data){
+    game.load(data.fen);
     board.position(data.fen);
+    currentTurn = data.turn;
+
+    document.getElementById("turn").innerText =
+        "Turn: " + currentTurn;
 
     if(data.move){
-        document.getElementById("moves").innerHTML += data.move + "<br>";
+        document.getElementById("moves").innerHTML +=
+            data.move + "<br>";
         moveList.push(data.fen);
-        reviewIndex = moveList.length - 1;
-        document.getElementById("moveSound").play();
     }
 
-    currentTurn = data.turn;
-    document.getElementById("turn").innerText = "Turn: " + currentTurn;
+    highlightCheck();
 });
 
 socket.on("check", function(){
-    document.getElementById("checkSound").play();
+    playSound("checkSound");
+    highlightCheck();
 });
 
 socket.on("game_over", function(data){
-    clearInterval(timerInterval);
-    document.getElementById("gameOverSound").play();
+    playSound("gameOverSound");
     alert("Game Over: " + data.result + " (" + data.reason + ")");
     document.getElementById("rematchBtn").style.display = "block";
 });
 
-function prevMove(){
-    if(reviewIndex > 0){
-        reviewIndex--;
-        board.position(moveList[reviewIndex]);
+function onDrop(source, target) {
+
+    if(playerColor !== currentTurn)
+        return 'snapback';
+
+    let move = game.move({
+        from: source,
+        to: target,
+        promotion: 'q'
+    });
+
+    if(move === null)
+        return 'snapback';
+
+    if(move.captured){
+        playSound("captureSound");
+    } else {
+        playSound("moveSound");
+    }
+
+    socket.emit("move", {
+        room: room,
+        move: source + target
+    });
+}
+
+function onSquareClick(square){
+
+    if(playerColor !== currentTurn)
+        return;
+
+    if(selectedSquare === null){
+        selectedSquare = square;
+        highlightMoves(square);
+    }
+    else{
+        let move = game.move({
+            from: selectedSquare,
+            to: square,
+            promotion: 'q'
+        });
+
+        if(move !== null){
+
+            if(move.captured){
+                playSound("captureSound");
+            } else {
+                playSound("moveSound");
+            }
+
+            socket.emit("move", {
+                room: room,
+                move: selectedSquare + square
+            });
+        }
+
+        removeHighlights();
+        selectedSquare = null;
     }
 }
 
-function nextMove(){
-    if(reviewIndex < moveList.length - 1){
-        reviewIndex++;
-        board.position(moveList[reviewIndex]);
+function highlightMoves(square){
+    removeHighlights();
+
+    let moves = game.moves({
+        square: square,
+        verbose: true
+    });
+
+    for(let i=0; i<moves.length; i++){
+        let squareEl =
+        document.querySelector('.square-' + moves[i].to);
+        if(squareEl)
+            squareEl.classList.add("highlight");
     }
+}
+
+function highlightCheck(){
+    removeHighlights();
+
+    if(game.in_check()){
+        let kingSquare = findKing(game.turn());
+        let squareEl =
+        document.querySelector('.square-' + kingSquare);
+        if(squareEl)
+            squareEl.classList.add("in-check");
+    }
+}
+
+function findKing(color){
+    let boardObj = game.board();
+    for(let i=0;i<8;i++){
+        for(let j=0;j<8;j++){
+            let piece = boardObj[i][j];
+            if(piece &&
+               piece.type === 'k' &&
+               piece.color === color[0]){
+                return 'abcdefgh'[j] + (8 - i);
+            }
+        }
+    }
+}
+
+function removeHighlights(){
+    document.querySelectorAll('.square-55d63')
+    .forEach(s => {
+        s.classList.remove("highlight");
+        s.classList.remove("in-check");
+    });
 }
 
 function rematch(){
     socket.emit("rematch", {room: room});
     document.getElementById("moves").innerHTML = "";
     moveList = [];
-    reviewIndex = -1;
     document.getElementById("rematchBtn").style.display = "none";
 }
 </script>
