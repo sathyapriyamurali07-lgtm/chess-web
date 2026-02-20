@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chess Web</title>
+</head>
+<body>
+    <h1>Online Chess</h1>
+    <button onclick="createGame()">Play With Friend</button>
+
+    <script>
+        async function createGame(){
+            let res = await fetch('/create');
+            let data = await res.json();
+            window.location.href = "/game/" + data.room;
+        }
+    </script>
+</body>
+</html>
