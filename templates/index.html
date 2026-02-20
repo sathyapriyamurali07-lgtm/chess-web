@@ -3,47 +3,52 @@
 <head>
     <title>Chess Web</title>
 
-    <!-- Chessboard CSS -->
-    <link rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"/>
-
     <style>
         body {
             font-family: Arial, sans-serif;
             text-align: center;
+            margin-top: 100px;
         }
-        #board {
-            width: 400px;
-            margin: 20px auto;
+
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        input {
+            padding: 8px;
+            font-size: 16px;
         }
     </style>
 </head>
 
 <body>
-    <h1>Online Chess</h1>
+
+    <h1>♟ Online Chess</h1>
 
     <button onclick="createGame()">Play With Friend</button>
 
-    <!-- Chessboard container -->
-    <div id="board"></div>
+    <br><br>
 
-    <!-- Chess Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+    <input type="text" id="roomInput" placeholder="Enter Room Code">
+    <button onclick="joinGame()">Join Game</button>
 
     <script>
-        // Create multiplayer room
         async function createGame(){
             let res = await fetch('/create');
             let data = await res.json();
             window.location.href = "/game/" + data.room;
         }
 
-        // Initialize board
-        var board = Chessboard('board', {
-            draggable: true,
-            position: 'start'
-        });
+        function joinGame(){
+            let room = document.getElementById("roomInput").value.trim();
+            if(room){
+                window.location.href = "/game/" + room;
+            }
+        }
     </script>
+
 </body>
 </html>
