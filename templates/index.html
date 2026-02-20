@@ -2,17 +2,48 @@
 <html>
 <head>
     <title>Chess Web</title>
+
+    <!-- Chessboard CSS -->
+    <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"/>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        #board {
+            width: 400px;
+            margin: 20px auto;
+        }
+    </style>
 </head>
+
 <body>
     <h1>Online Chess</h1>
+
     <button onclick="createGame()">Play With Friend</button>
 
+    <!-- Chessboard container -->
+    <div id="board"></div>
+
+    <!-- Chess Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+
     <script>
+        // Create multiplayer room
         async function createGame(){
             let res = await fetch('/create');
             let data = await res.json();
             window.location.href = "/game/" + data.room;
         }
+
+        // Initialize board
+        var board = Chessboard('board', {
+            draggable: true,
+            position: 'start'
+        });
     </script>
 </body>
 </html>
