@@ -45,4 +45,5 @@ def on_move(data):
             emit("game_over", board.result(), room=room)
 
 if __name__ == "__main__":
-    socketio.run(app, debug=True)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
