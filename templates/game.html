@@ -2,25 +2,47 @@
 <html>
 <head>
     <title>Game</title>
+
     <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
+
+    <!-- Chessboard CSS -->
+    <link rel="stylesheet"
+    href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css"/>
+
+    <!-- Chessboard JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
 </head>
+
 <body>
-    <h2>Room: {{ room }}</h2>
-    <div id="board"></div>
+<h2>Room: {{ room }}</h2>
+<div id="board" style="width: 400px"></div>
 
 <script>
 const socket = io();
 const room = "{{ room }}";
 
+const board = Chessboard('board', {
+    draggable: true,
+    position: 'start',
+    onDrop: function(source, target) {
+        socket.emit("move", {
+            room: room,
+            move: source + target
+        });
+    }
+});
+
 socket.emit("join", {room: room});
 
 socket.on("state", function(fen){
-    console.log("Board:", fen);
+    board.position(fen);
 });
 
 socket.on("game_over", function(result){
     alert("Game Over: " + result);
 });
 </script>
+
 </body>
 </html>
